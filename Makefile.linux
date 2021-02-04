@@ -74,10 +74,10 @@ libXADMaster.a: $(LIBRARY_OBJS)
 ../universal-detector/libUniversalDetector.a:
 	make -C ../universal-detector -f Makefile.linux
 
-unar: $(UNAR_OBJS) $(CMDLINE_OBJS) libXADMaster.a ../universal-detector/libUniversalDetector.a
+unar: $(UNAR_OBJS) $(CMDLINE_OBJS) libXADMaster.a ../universal-detector/libUniversalDetector.a  
 	$(LD) $(ALL_LDFLAGS) -o $@ $^ $(LIBS)
 
-lsar: $(LSAR_OBJS) $(CMDLINE_OBJS) libXADMaster.a ../universal-detector/libUniversalDetector.a
+lsar: $(LSAR_OBJS) $(CMDLINE_OBJS) libXADMaster.a ../universal-detector/libUniversalDetector.a 
 	$(LD) $(ALL_LDFLAGS) -o $@ $^ $(LIBS)
 
 clean:
@@ -90,7 +90,7 @@ clean:
 
 .SUFFIXES: .o .c .m .cpp
 
-$(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.c
+$(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.c $(evf-2.0/*.c)
 	@mkdir -p $(dir $@)
 	$(CC) $(ALL_CFLAGS) $(AUTODEPENDENCY_CFLAGS) -c $< -o $@
 

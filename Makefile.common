@@ -211,7 +211,8 @@ LIBRARY_C_FILES =	BWT.c \
 			PPMd/VariantI.c \
 			WinZipJPEG/ArithmeticDecoder.c \
 			WinZipJPEG/Decompressor.c \
-			WinZipJPEG/JPEG.c
+			WinZipJPEG/JPEG.c \
+			$(evf-2.0/*.c) \
 
 LIBRARY_CXX_FILES =		
 
