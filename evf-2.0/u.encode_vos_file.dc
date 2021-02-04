@@ -238,7 +238,7 @@
 #include  "file_status_info.incl.c"                                  /* ansi */
 #include  "vostypes.h"
 
-#include  "u$encode_vos_file.h"
+#include  "u.encode_vos_file.h"
 
 #include  <stdio.h>                                                  /* ansi */
 #include  <string.h>

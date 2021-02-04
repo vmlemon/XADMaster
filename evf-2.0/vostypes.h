@@ -1,6 +1,7 @@
 /*
  *   stdtypes.h     Standard Types used for VOS applications.
  */
+//#include <char_varying.h>
 
 typedef char_varying(32)      object_t;
 typedef char_varying(66)      device_t;
