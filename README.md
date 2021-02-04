@@ -22,6 +22,7 @@ The resulting directory structure should look like:
   /XADMaster
   /UniversalDetector
 ```
+Compiling this under Ubuntu requires the gobjc++ package, to supply cc1obj; as well as gnustep-core-devel, libarchive-dev, and libbz2-dev 
 
 # Usages
 
