@@ -1,0 +1,1 @@
+Build/WinZipJPEG/JPEG.o: WinZipJPEG/JPEG.c WinZipJPEG/JPEG.h

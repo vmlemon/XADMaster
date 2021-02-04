@@ -20,7 +20,7 @@
  */
 #import "XADString.h"
 
-#import "../UniversalDetector/UniversalDetector.h"
+#import "../universal-detector/UniversalDetector.h"
 
 
 

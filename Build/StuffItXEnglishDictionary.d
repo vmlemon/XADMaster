@@ -1,0 +1,1 @@
+Build/StuffItXEnglishDictionary.o: StuffItXEnglishDictionary.c

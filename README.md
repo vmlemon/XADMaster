@@ -13,16 +13,16 @@
 XADMaster relies on directories structure. To start development you'll need to clone the main project with Universal Detector library:
 ```
 git clone https://github.com/MacPaw/XADMaster.git
-git clone https://github.com/MacPaw/universal-detector.git UniversalDetector
+git clone https://github.com/MacPaw/universal-detector.git 
 ```
 The resulting directory structure should look like:
 
 ```
 <development-directory>
   /XADMaster
-  /UniversalDetector
+  /universal-detector
 ```
-Compiling this under Ubuntu requires the gobjc++ package, to supply cc1obj; as well as gnustep-core-devel, libarchive-dev, and libbz2-dev 
+Compiling this under Ubuntu requires the gobjc++ package, to supply cc1obj; as well as gnustep-core-devel, libarchive-dev, and libbz2-dev, libwavpack-dev, icu-devtools, libicu-dev
 
 # Usages
 
