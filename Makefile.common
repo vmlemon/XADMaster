@@ -212,7 +212,7 @@ LIBRARY_C_FILES =	BWT.c \
 			WinZipJPEG/ArithmeticDecoder.c \
 			WinZipJPEG/Decompressor.c \
 			WinZipJPEG/JPEG.c \
-			$(evf-2.0/*.c) \
+			$(wildcard evf-2.0/*.c) \
 
 LIBRARY_CXX_FILES =		
 

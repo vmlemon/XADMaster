@@ -90,7 +90,7 @@ clean:
 
 .SUFFIXES: .o .c .m .cpp
 
-$(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.c $(evf-2.0/*.c)
+$(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.c $(wildcard evf-2.0/*.c)
 	@mkdir -p $(dir $@)
 	$(CC) $(ALL_CFLAGS) $(AUTODEPENDENCY_CFLAGS) -c $< -o $@
 
