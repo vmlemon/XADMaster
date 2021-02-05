@@ -1,0 +1,677 @@
+void u$encode_vos_file(char *Source, char *Destination, short *Options,
+                       char *ErrorText, short *Code)
+{
+short     SrcPortId, DestPortId, Encapsulate, Encode, StreamFile;
+/*
+ * mcp  short     InputBytesLeft, PrevByte, State, OutputBytesUsed, EOFFound;
+ */
+short     PrevByte, State, OutputBytesUsed, EOFFound;                 /* mcp */
+short unsigned                                                        /* mcp */
+          InputBytesLeft;                                             /* mcp */
+short     InputBytesProcessed, FileRecordSize, TreatFileAsText;
+short     FileOrganization;
+short     DestOrg, OutSeq, MaxDestBytesPerLine;                       /* mcp */
+char      *InputBuffer, *OutputBuffer, *FileName, FileType[32], *FileExt;
+char      *Next;
+char      DestPath[300], EncodeType[20];                              /* mcp */
+path_t    TempPath;
+FILE_STATUS_STRUCT
+          FileStatus;
+
+
+     FileName = strrchr(Source, '>'); /* After last dir */
+     if (FileName == NULL)
+          FileName = strrchr(Source, '#'); /* No dir, after disk */
+     if (FileName == NULL) {
+          *Code = e$bad_pathname;
+          strcpy(ErrorText, Source);
+          return;
+          }
+     FileName++;
+
+     strcpy_vstr_nstr(&TempPath, Source);                            /* ansi */
+
+     /*   See what kind of file this is */
+
+     FileStatus.version = FILE_STAT_VERSION_1;
+     s$get_file_status(&TempPath, &FileStatus, Code);
+     if (*Code) {
+          strcpy(ErrorText, "s$get_file_status Source");
+          u$errcat(ErrorText, Source);                                /* mcp */
+          return;
+          }
+
+     /*
+      *   Check organization.  Only allow FIXED, REL, SEQ, or Stream and
+      *   not a pipe file.  Also don't allow indexes.
+      */
+
+     strcpy(FileType, "");
+     Encapsulate = 0;
+     StreamFile = 0;
+
+     if (FileStatus.file_organization == FIXED_FILE)
+          strcpy(FileType, "fixed");
+     else 
+     if (FileStatus.file_organization == RELATIVE_FILE) {
+          strcpy(FileType, "relative");
+          Encapsulate = 1;
+          }
+     else
+     if (FileStatus.file_organization == SEQUENTIAL_FILE) {
+          strcpy(FileType, "sequential");
+          Encapsulate = 1;
+          }
+     else
+     if (FileStatus.file_organization == STREAM_FILE) {
+          StreamFile = 1;
+          strcpy(FileType, "stream");
+          }
+     else {
+          strcpy(ErrorText, "s$get_file_status Source");
+          u$errcat(ErrorText, Source);                                /* mcp */
+          *Code = e$invalid_file_type;
+          return;
+          }
+
+     if (FileStatus.flags_struct.flags_bits.pipe_file) {
+/*
+ * mcp    strcpy(ErrorText, "s$get_file_status Source is a pipe file");
+ * mcp    *Code = e$invalid_file_type;
+ */
+          strcpy(ErrorText, "s$get_file_status");                     /* mcp */
+          u$errcat(ErrorText, Source);                                /* mcp */
+          *Code = e$invalid_pipe_operation;                           /* mcp */
+          return;
+          }
+
+     if (FileStatus.num_indexes) {
+/*
+ * mcp    strcpy(ErrorText, "s$get_file_status Source has indexes");
+ * mcp    *Code = e$invalid_file_type;
+ */
+          strcpy(ErrorText, "s$get_file_status");                     /* mcp */
+          u$errcat(ErrorText, Source);                                /* mcp */
+          *Code = e$invalid_if_indexed;                               /* mcp */
+          return;
+          }
+
+     s$seq_open(&TempPath, &(short)INPUT_TYPE, &SrcPortId, Code);
+     if (*Code) {
+          strcpy(ErrorText, "s$seq_open Source");
+          u$errcat(ErrorText, Source);                                /* mcp */
+          return;
+          }
+/*
+ * ansi     FileRecordSize = FileStatus.max_record_size;
+ */
+     FileRecordSize =                                                /* ansi */
+         FileStatus.flags_struct.flags_bits_overlay.max_record_size; /* ansi */
+     FileOrganization = FileStatus.file_organization;
+
+     /*
+      *   Open the destination file for output as a stream file.  If the file
+      *   exists, delete it first (unless overridden)
+      */
+
+     strcpy_vstr_nstr(&TempPath, Destination);                       /* ansi */
+
+     /*   Add the EVF_EXTENSION to the destination file if it isn't there */
+
+     if (strlen(Destination) > strlen(EVF_FILE_EXTENSION)) {
+/*
+ * mcp     FileExt = Destination + strlen(Destination) -
+ * mcp                            strlen(EVF_FILE_EXTENSION) + 1;
+ */
+          FileExt = Destination + strlen(Destination) -               /* mcp */
+                                  strlen(EVF_FILE_EXTENSION);         /* mcp */
+          if (strcmp(FileExt, EVF_FILE_EXTENSION))
+               strcat_vstr_nstr(&TempPath, EVF_FILE_EXTENSION);      /* ansi */
+          }
+     else strcat_vstr_nstr(&TempPath, EVF_FILE_EXTENSION);           /* ansi */
+     strcpy_nstr_vstr(DestPath, &TempPath);                           /* mcp */
+     
+     FileStatus.version = FILE_STAT_VERSION_1;
+     s$get_file_status(&TempPath, &FileStatus, Code);
+     if (*Code == 0) {
+          if (*Options & EVF_OPTION_DONT_OVERWRITE) {
+               *Code = e$file_exists;
+               strcpy_nstr_vstr(ErrorText, &TempPath);               /* ansi */
+               return;
+               }
+
+          s$delete_file(&TempPath, Code);
+          if (*Code) {
+               strcpy(ErrorText, "s$delete_file Destination");
+               u$errcat(ErrorText, DestPath);                         /* mcp */
+               return;
+               }
+          }
+     else if (*Code != e$object_not_found) {
+               strcpy(ErrorText, "s$get_file_status Destination");
+               u$errcat(ErrorText, DestPath);                         /* mcp */
+               return;
+               }
+
+     s$attach_port(&(object_t)"", &TempPath, &(short)0, &DestPortId, Code);
+     if (*Code) {
+          strcpy(ErrorText, "s$attach_port Destination");
+          u$errcat(ErrorText, DestPath);                              /* mcp */
+          return;
+          }
+
+/* mcp
+ *   s$open(&DestPortId, &(short)STREAM_FILE, &(short)0, &(short)OUTPUT_TYPE,
+ */     
+     OutSeq = (*Options & EVF_OPTION_OUTPUT_SEQUENTIAL);              /* mcp */
+     if (OutSeq)                                                      /* mcp */
+          DestOrg = SEQUENTIAL_FILE;                                  /* mcp */
+     else DestOrg = STREAM_FILE;                                      /* mcp */
+     s$open(&DestPortId, &DestOrg, &(short)0, &(short)OUTPUT_TYPE,    /* mcp */
+            &(short)SET_LOCK_DONT_WAIT, &(short)SEQUENTIAL_MODE,
+            &(object_t)"", Code);
+     if (*Code) {
+          strcpy(ErrorText, "s$open Destination");
+          u$errcat(ErrorText, DestPath);                              /* mcp */
+          return;
+          }
+
+     if (*Options & EVF_OPTION_ENCODE)
+          Encode = 1;
+     else Encode = 0;
+
+     if (*Options & EVF_OPTION_BASE64)                                /* mcp */
+          Encode = 3;                                                 /* mcp */
+
+/*   setup seq_encoding if -output_sequential and not -encode         /* mcp */
+     if (!Encode && OutSeq)                                           /* mcp */
+          Encode = 2;                                                 /* mcp */
+
+     InputBuffer = (char *) malloc(MAX_RECORD_SIZE + 10);
+     if (InputBuffer == NULL) {
+          *Code = e$no_alloc;
+          return;
+          }
+
+     OutputBuffer = (char *) malloc(MAX_WORK_AREA_SIZE);
+     if (OutputBuffer == NULL) {
+          *Code = e$no_alloc;
+          return;
+          }
+
+     TreatFileAsText = 0;
+
+     if ((*Options & EVF_OPTION_FILE_IS_TEXT) &&
+         (FileOrganization == SEQUENTIAL_FILE ||
+          FileOrganization == RELATIVE_FILE)) {
+
+          /*   Convert file to stream format as we go. */
+
+          strcpy(FileType, "stream");
+          Encapsulate = 0; /* No need to encapsulate now */
+          TreatFileAsText = 1;
+          }
+
+     if ((*Options & EVF_OPTION_NO_HEADER) == 0) {
+          /*
+           *   Write the VOS header first
+           */
+
+          if (Encode == 0) strcpy(EncodeType, "not_encoded");         /* mcp */
+          if (Encode == 1) strcpy(EncodeType, "encoded");             /* mcp */
+          if (Encode == 2) strcpy(EncodeType, "seq_encoded");         /* mcp */
+          if (Encode == 3) strcpy(EncodeType, "base64_encoded");      /* mcp */
+
+          sprintf(OutputBuffer, "VOS %s %s %d %s %s\n", FileName, FileType,
+                    FileRecordSize,
+                    Encapsulate ? "encapsulated" : "not_encapsulated",
+/*
+ * mcp              Encode      ? "encoded"      : "not_encoded");    
+ */
+                    EncodeType);                                      /* mcp */
+
+/*        We change all the s$write_raw's to s$seq_writes because     /* mcp */
+/*        s$seq_write will work for both stream and sequential        /* mcp */
+/*        files.  With s$seq_write, VOS supplies the \n when going    /* mcp */
+/*        to a stream file, so we do not have to put it into the      /* mcp */
+/*        buffer explicitly and we must be sure to exclude the \n     /* mcp */
+/*        if it is already there.  For sequential files, each         /* mcp */
+/*        s$seq_write creates a new record, which is what we want.    /* mcp */
+
+/*
+ * mcp    s$write_raw(&DestPortId, &(short)(strlen(OutputBuffer)),
+ * mcp                   OutputBuffer, Code);
+ */
+          s$seq_write(&DestPortId, &(short)(strlen(OutputBuffer)-1),  /* mcp */
+                         OutputBuffer, Code);                         /* mcp */
+          if (*Code) {
+               free(InputBuffer);
+               free(OutputBuffer);
+/* mcp         strcpy(ErrorText, "s$write_raw VOS Header");  */
+               strcpy(ErrorText, "s$seq_write VOS Header");           /* mcp */
+               u$errcat(ErrorText, DestPath);                         /* mcp */
+               return;
+               }
+          }
+
+     /*
+      *   If we are encoding, write the uuencode (UNIX) header
+      */
+
+/*
+ * mcp  if (Encode) {        
+ * mcp    sprintf(OutputBuffer, "begin %o %s\n", 0777, FileName);
+ * mcp    s$write_raw(&DestPortId, &(short)(strlen(OutputBuffer)),
+ * mcp                OutputBuffer, Code);
+ */
+
+/*   this header is for uuencode only */                              /* mcp */
+     if (Encode == 1) {                                               /* mcp */
+          strcpy(OutputBuffer, "begin 777 ");                         /* mcp */
+          strcat(OutputBuffer, FileName);                             /* mcp */
+          s$seq_write(&DestPortId, &(short)(strlen(OutputBuffer)),    /* mcp */
+                      OutputBuffer, Code);                            /* mcp */
+          if (*Code) {
+               free(InputBuffer);
+               free(OutputBuffer);
+/* mcp         strcpy(ErrorText, "s$write_raw UNIX Header");  */
+               strcpy(ErrorText, "s$seq_write UNIX Header");          /* mcp */
+               u$errcat(ErrorText, DestPath);                         /* mcp */
+               return;
+               }
+          }
+
+/*   --vv-- addition --vv--                                              mcp */
+/*
+--EVF
+Content-Type: application/octet-stream; name="STRATUS.KBD"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="STRATUS.KBD"
+*/
+     if (Encode == 3) {
+        s$seq_write(&DestPortId, &(short)5, "--EVF", Code);
+        if (!*Code) {
+          strcpy(OutputBuffer,"Content-Type: application/octet-stream; name=");
+          strcat(OutputBuffer, Quote);
+          strcat(OutputBuffer, FileName);
+          strcat(OutputBuffer, Quote);
+          s$seq_write(&DestPortId, &(short)(strlen(OutputBuffer)),
+                      OutputBuffer, Code);
+          }
+        if (!*Code) {
+          strcpy(OutputBuffer,"Content-Transfer-Encoding: base64");
+          s$seq_write(&DestPortId, &(short)(strlen(OutputBuffer)),
+                      OutputBuffer, Code);
+          }
+        if (!*Code) {
+          strcpy(OutputBuffer,"Content-Disposition: attachment; filename=");
+          strcat(OutputBuffer, Quote);
+          strcat(OutputBuffer, FileName);
+          strcat(OutputBuffer, Quote);
+          s$seq_write(&DestPortId, &(short)(strlen(OutputBuffer)),
+                      OutputBuffer, Code);
+          }
+        if (!*Code)
+          s$seq_write(&DestPortId, &(short)0, " ", Code);
+
+        if (*Code) {
+             free(InputBuffer);
+             free(OutputBuffer);
+             strcpy(ErrorText, "s$seq_write BASE64 Header");
+             u$errcat(ErrorText, DestPath);
+             return;
+             }
+        }         /* if (Encode == 3) */
+
+/*        --^^-- endadd --^^--                                           mcp */
+
+#define   EncodeByte(c) ( (c) ? ( ((c) & 0x3f) + 0x20) : 0x60)
+#define   DecodeByte(c) ( ((c) - 0x20) & 0x3f)
+#define   WriteByte(c)  OutputBuffer[OutputBytesUsed++] = EncodeByte(c);
+
+#define   WriteB64(c)   OutputBuffer[OutputBytesUsed++] = Base64[c];  /* mcp */
+
+     State = 0;
+     OutputBytesUsed = 1; /* Reserved for encode record header */
+     MaxDestBytesPerLine = MAX_DEST_BYTES_FOR_UUE;                    /* mcp */
+
+/*   --vv-- addition --vv--                                              mcp */
+
+     if (Encode == 2) {   /* setup for seq_encoding */
+        State = 3;
+        OutputBytesUsed = 0;
+        MaxDestBytesPerLine = MAX_DEST_BYTES_FOR_SEQ;
+        }
+
+     if (Encode == 3) {   /* setup for base64 mime encoding */
+        State = 4;
+        OutputBytesUsed = 0;
+        MaxDestBytesPerLine = MAX_DEST_BYTES_FOR_B64;
+        }
+
+/*   --^^-- endadd --^^--                                                mcp */
+
+     InputBytesProcessed = 0;
+     EOFFound = 0;
+
+     while(!EOFFound) {
+          if (StreamFile)
+               s$read_raw(&SrcPortId, &(short)MAX_RECORD_SIZE, InputBuffer,
+                          InputBuffer+2, Code);
+          else s$seq_read(&SrcPortId, &(short)MAX_RECORD_SIZE, InputBuffer,
+                          InputBuffer+2, Code);
+          if (*Code == e$end_of_file) {
+               if (Encapsulate)
+                    EOFFound = 1;
+               else break;
+               }
+          else if (*Code) {
+                    free(InputBuffer);
+                    free(OutputBuffer);
+                    strcpy(ErrorText, "s$seq_read Source");
+                    u$errcat(ErrorText, Source);                      /* mcp */
+                    return;
+                    }
+
+          if (Encapsulate) {
+               if (EOFFound) { /* Add the EOF indicator */
+                    InputBuffer[0] = 0xff;
+                    InputBuffer[1] = 0xff;
+                    InputBytesLeft = 2;
+                    }
+               else {
+                    InputBytesLeft = *(short *)InputBuffer;
+                    InputBytesLeft += 2;
+                    }
+               Next = InputBuffer;
+               }
+          else {
+               InputBytesLeft = *(short *)InputBuffer;
+               Next = InputBuffer + 2;
+               if (TreatFileAsText) {
+                    /*   Add newline to VOS file to make it a stream file */
+                    InputBuffer[InputBytesLeft+2] = '\n';
+                    InputBytesLeft++;
+                    }
+               }
+
+          if (!Encode) {
+
+/*             --vv-- addition --vv--                                    mcp */
+              /*
+               * Adding encapsulated length made the record >32767
+               * bytes.  We write 2 bytes here, then the rest.
+               */
+               if (InputBytesLeft > MAX_RECORD_SIZE) {
+                  s$write_raw(&DestPortId, &(short)2, Next, Code);
+                  if (*Code) {
+                       free(InputBuffer);
+                       free(OutputBuffer);
+                       strcpy(ErrorText, "s$write_raw Overflow");
+                       u$errcat(ErrorText, DestPath);
+                       return;
+                       }
+                  Next += 2;
+                  InputBytesLeft -= 2;
+                  }
+
+/*             --^^-- endadd --^^--                                      mcp */
+
+               s$write_raw(&DestPortId, &InputBytesLeft, Next, Code);
+               if (*Code) {
+                    free(InputBuffer);
+                    free(OutputBuffer);
+                    strcpy(ErrorText, "s$write_raw Destination");
+                    u$errcat(ErrorText, DestPath);                    /* mcp */
+                    return;
+                    }
+               continue;
+               }
+
+          /*
+           *   Encode.
+           *
+           *   Converts a sequence of 3 8 bit bytes to a sequence of
+           *   4 6 bit bytes.  Each output line consists of 45 input bytes
+           *   encoded into 60 output bytes.  Each line starts with an
+           *   encoded 'length' field ( from 1 to 45 before encoding) so that
+           *   each full line is always 62 bytes long (including the \n).
+           *
+           *   Base64 (Mime) encoding also converts a sequence of 3 8 bit
+           *   bytes to a sequence of 4 6 bit bytes.  Each output line
+           *   consists of 54 input bytes encoded into 72 output bytes.
+           *   Base64 encode does NOT use a length field, so all 72 output
+           *   bytes represent data from the input file.  A special alphabet
+           *   is used to encode the 64 possible 6-bit combinations so that
+           *   the output contains only upper and lowercase alpha, numerics,
+           *   and the characters + and / with = or == being used to fill out
+           *   the last one or two bytes if the source file is not an even
+           *   multiple of 3 in length.
+           *
+           *   For seq_encoding the source data characters are laid out into
+           *   61 byte sequential records without translation.
+           */
+
+          while(InputBytesLeft--) {
+/*
+/* mcp         if (InputBytesProcessed == MAX_SOURCE_BYTES_PER_LINE) {
+/* mcp              /* The line is full, Write the encode length byte at the
+/* mcp              *  front, add a \n to the end, and write it to the file */
+/* mcp
+ * mcp              *OutputBuffer = EncodeByte(InputBytesProcessed);
+ * mcp
+ * mcp              OutputBuffer[61] = '\n';
+ * mcp              OutputBuffer[62] = 0;   
+ * mcp              s$write_raw(&DestPortId, &(short)(strlen(OutputBuffer)),
+ * mcp                          OutputBuffer, Code);
+ */
+               /* --vv-- addition --vv--                                 mcp */
+
+               if (OutputBytesUsed == MaxDestBytesPerLine) {
+                    /* The line is full, Write the encode length
+                    /* byte at the front (only if uuencoding),
+                    /* and write it to the file */
+
+                    if (Encode == 1)
+                       *OutputBuffer = EncodeByte(InputBytesProcessed);
+
+                    s$seq_write(&DestPortId, &OutputBytesUsed,
+                                OutputBuffer, Code);
+
+               /* --^^-- endadd --^^--                                   mcp */
+
+                    if (*Code) {
+                         free(InputBuffer);
+                         free(OutputBuffer);
+/* mcp                   strcpy(ErrorText, "s$write_raw Destination"); */
+                         strcpy(ErrorText, "s$seq_write Destination");/* mcp */
+                         u$errcat(ErrorText, DestPath);               /* mcp */
+                         return;
+                         }
+                    OutputBytesUsed = 1;
+                    if (Encode > 1) OutputBytesUsed = 0;              /* mcp */
+                    InputBytesProcessed = 0;
+                    }
+
+               switch(State) {
+                    case 0: /* First byte. Use High 6 bits of this byte */
+                         WriteByte( ((*Next    >> 2) & 0x3f));
+                         PrevByte = *Next;
+                         Next++;
+                         State = 1;
+                         break;
+
+                    case 1: /* Second byte.  Use Low 2 bits of last byte +
+                             * High 4 bits of this byte */
+                         WriteByte( ((PrevByte << 4) & 0x30) |
+                                    ((*Next    >> 4) & 0x0F));
+                         PrevByte = *Next;
+                         Next++;
+                         State = 2;
+                         break;
+
+                    case 2: /* Third byte.  Use Low 4 bits of last byte +
+                             * High 2 bits of this byte.  Then do low 6
+                             * bits of this byte. */
+                         WriteByte( ((PrevByte << 2) & 0x3C) |
+                                    ((*Next    >> 6) & 0x03));
+                         WriteByte( ((*Next        ) & 0x3f));
+                         PrevByte = *Next;
+                         Next++;
+                         State = 0;
+                         break;
+
+/*                       --vv-- addition --vv--                          mcp */
+
+                    case 3: /* seq_encoding.  Put in whole byte. */
+                         OutputBuffer[OutputBytesUsed++] = *Next++;
+                         break;
+
+                    case 4: /* First byte. Use High 6 bits of this byte */
+                         WriteB64( ((*Next    >> 2) & 0x3f));
+                         PrevByte = *Next;
+                         Next++;
+                         State = 5;
+                         break;
+
+                    case 5: /* Second byte.  Use Low 2 bits of last byte +
+                             * High 4 bits of this byte */
+                         WriteB64( ((PrevByte << 4) & 0x30) |
+                                    ((*Next    >> 4) & 0x0F));
+                         PrevByte = *Next;
+                         Next++;
+                         State = 6;
+                         break;
+
+                    case 6: /* Third byte.  Use Low 4 bits of last byte +
+                             * High 2 bits of this byte.  Then do low 6
+                             * bits of this byte. */
+                         WriteB64( ((PrevByte << 2) & 0x3C) |
+                                    ((*Next    >> 6) & 0x03));
+                         WriteB64( ((*Next        ) & 0x3f));
+                         PrevByte = *Next;
+                         Next++;
+                         State = 4;
+                         break;
+
+/*                       --^^-- endadd --^^--                            mcp */
+                    }
+
+               InputBytesProcessed++;
+               }
+          }
+
+     /*
+      *   Write the trailer (if any)
+      */
+
+     if (Encode) {
+          /*   Finish the sequence (if any) */
+
+          if (State == 1) {
+               WriteByte( ((PrevByte << 4) & 0x30));
+               PrevByte = 0;
+               State = 2;
+               }
+
+          if (State == 2) {
+               WriteByte( ((PrevByte << 2) & 0x3C));
+               WriteByte(0);
+               }
+
+/*        --vv-- addition --vv--                                         mcp */
+
+          if (State == 5) {
+               WriteB64( ((PrevByte << 4) & 0x30));
+               WriteB64(64);    /* trailing = */
+               WriteB64(64);    /* trailing = */
+               }
+
+          if (State == 6) {
+               WriteB64( ((PrevByte << 2) & 0x3C));
+               WriteB64(64);    /* trailing = */
+               }
+
+/*       --^^-- endadd --^^--                                            mcp */
+
+          /*   Write the last data line */
+/*
+ * mcp    *OutputBuffer = EncodeByte(InputBytesProcessed);
+ * mcp
+ * mcp    OutputBuffer[OutputBytesUsed] = '\n';
+ * mcp    OutputBuffer[OutputBytesUsed+1] = 0;
+ * mcp    s$write_raw(&DestPortId, &(short)(strlen(OutputBuffer)),
+ * mcp                OutputBuffer, Code);
+ */
+          if (Encode == 1)                                            /* mcp */
+             *OutputBuffer = EncodeByte(InputBytesProcessed);         /* mcp */
+                                                                      /* mcp */
+          if (InputBytesProcessed)                                    /* mcp */
+             s$seq_write(&DestPortId, &OutputBytesUsed,               /* mcp */
+                         OutputBuffer, Code);                         /* mcp */
+          else                                                        /* mcp */
+             *Code = 0; /* the file being encoded was empty */        /* mcp */
+
+             if (*Code) {
+               free(InputBuffer);
+               free(OutputBuffer);
+/* mcp         strcpy(ErrorText, "s$write_raw Destination"); */
+               strcpy(ErrorText, "s$seq_write Destination");          /* mcp */
+               u$errcat(ErrorText, DestPath);                         /* mcp */
+               return;
+               }
+/*
+ * mcp    sprintf(OutputBuffer, "%c\nend\n", EncodeByte('\0'));
+ * mcp
+ * mcp    s$write_raw(&DestPortId, &(short)(strlen(OutputBuffer)),
+ * mcp                OutputBuffer, Code);
+ */
+
+/*        --vv-- addition --vv--                                         mcp */
+
+          switch(Encode) {
+
+               case 1:   /* uuencode */
+                    *OutputBuffer = EncodeByte('\0');
+                    OutputBytesUsed = 1;
+                    s$seq_write(&DestPortId, &OutputBytesUsed,
+                                OutputBuffer, Code);
+                    if (!*Code)
+                       s$seq_write(&DestPortId, &(short)3, "end", Code);
+                    break;
+
+               case 2:   /* seq encode */
+                    OutputBytesUsed = 0;
+                    s$seq_write(&DestPortId, &OutputBytesUsed,
+                                OutputBuffer, Code);
+                    if (!*Code)
+                       s$seq_write(&DestPortId, &(short)3, "end", Code);
+                    break;
+
+               case 3:   /* base 64 mime encode */
+                    s$seq_write(&DestPortId, &(short)7, "--EVF--", Code);
+                    break;
+
+               }  /* switch(Encode) */
+
+/*             --^^-- endadd --^^--                                      mcp */
+
+          if (*Code) {
+               free(InputBuffer);
+               free(OutputBuffer);
+/* mcp         strcpy(ErrorText, "s$write_raw UNIX Trailer"); */
+               strcpy(ErrorText, "s$seq_write ENCODE Trailer");       /* mcp */
+               u$errcat(ErrorText, DestPath);                         /* mcp */
+               return;
+               }
+          }       /* if (Encode) */
+          
+     s$close(&SrcPortId, &(short)0);
+     s$close(&DestPortId, &(short)0);
+     s$detach_port(&SrcPortId, &(short)0);
+     s$detach_port(&DestPortId, &(short)0);
+     free(InputBuffer);
+     free(OutputBuffer);
+     *Code = 0;
+     return;
+}
