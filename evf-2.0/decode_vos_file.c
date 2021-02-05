@@ -39,7 +39,7 @@
 #include  <string.h>                                                 /* ansi */
 
 #include  "vostypes.h"
-#include  "u$encode_vos_file.h"
+#include  "u.encode_vos_file.h"
 
 static object_t     MyName = "decode_vos_file";
 
