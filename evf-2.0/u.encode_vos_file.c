@@ -267,7 +267,7 @@ extern void s$get_file_status();
 extern void s$open();
 extern void s$read_raw();
 extern void s$seq_open();
-extern void s$seq_position();
+//extern void s$seq_position();
 extern void s$seq_read();
 extern void s$seq_write();
 extern void s$write_raw();
@@ -301,7 +301,7 @@ FILE_STATUS_STRUCT
           FileStatus;
 int       ScanRecordSize, ScanMode;
 
-     strcpy_vstr_nstr(&TempPath, Source);                            /* ansi */
+     //strcpy_vstr_nstr(&TempPath, Source);                            /* ansi */
 
      s$seq_open(&TempPath, &(short)INPUT_TYPE, &SrcPortId, Code);
      if (*Code) {
@@ -382,8 +382,8 @@ int       ScanRecordSize, ScanMode;
                   * a specific error and quit.
                   */
                   ScanMode = -5;
-                  s$seq_position(&SrcPortId, &(short)POS_BEGINNING_OF_FILE,
-                                 &(long)0, Code);
+                  //s$seq_position(&SrcPortId, &(short)POS_BEGINNING_OF_FILE,
+                    //             &(long)0, Code);
                   if (!*Code)
                      continue;   /* reread file from beginning */
                   }
@@ -441,8 +441,8 @@ int       ScanRecordSize, ScanMode;
              if (InputBytesLeft >= 40 && InputBytesLeft % 4 == 0
                     && strspn(InputBuffer, Base64) == InputBytesLeft) {
 
-                s$seq_position(&SrcPortId, &(short)POS_NUM_RECORDS_BACKWARD,
-                               &(long)0, Code);
+               // s$seq_position(&SrcPortId, &(short)POS_NUM_RECORDS_BACKWARD,
+                 //              &(long)0, Code);
 
                 break;   /* this line qualifies as beginning of base64 data */
                 }
@@ -787,7 +787,7 @@ int       ScanRecordSize, ScanMode;
      *  that VOS does not like.  Kill the name if it would
      *  be illegal for VOS.
      */
-     strcpy_vstr_nstr(&TempPath, FileName);
+     //strcpy_vstr_nstr(&TempPath, FileName);
      s$expand_path(&TempPath, &(object_t)"", &TempPath, Code);
      if (*Code || strchr(FileName, '*') != NULL)
         *FileName = '\0';
