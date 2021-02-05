@@ -258,7 +258,7 @@ short     e$bad_pathname, e$invalid_file_type, e$file_exists,
 /* --vv-- addition --vv--                                                mcp */
 
 extern void s$attach_port();
-extern void s$close();
+//extern void s$close();
 extern void s$delete_file();
 extern void s$detach_port();
 extern void s$expand_path();
@@ -832,8 +832,8 @@ int       ScanRecordSize, ScanMode;
      Next = strchr(Destination, '#');
      if (Next != NULL) {
         if (!strcmp(Next, "#null")) {
-           s$close(&SrcPortId, Code);
-           s$detach_port(&SrcPortId, Code);
+           //s$close(&SrcPortId, Code);
+           //s$detach_port(&SrcPortId, Code);
            free(InputBuffer);
            free(OutputBuffer);
            return;
@@ -1395,10 +1395,10 @@ int       ScanRecordSize, ScanMode;
 
           }     /* if (Encode) */
 
-     s$close(&SrcPortId, &(short)0);
-     s$close(&DestPortId, &(short)0);
-     s$detach_port(&SrcPortId, &(short)0);
-     s$detach_port(&DestPortId, &(short)0);
+     //s$close(&SrcPortId, &(short)0);
+     //s$close(&DestPortId, &(short)0);
+     //s$detach_port(&SrcPortId, &(short)0);
+     //s$detach_port(&DestPortId, &(short)0);
      free(InputBuffer);
      free(OutputBuffer);
      *Code = 0;
