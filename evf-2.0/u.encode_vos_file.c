@@ -257,7 +257,7 @@ short     e$bad_pathname, e$invalid_file_type, e$file_exists,
 
 /* --vv-- addition --vv--                                                mcp */
 
-extern void s$attach_port();
+//extern void s$attach_port();
 //extern void s$close();
 extern void s$delete_file();
 extern void s$detach_port();
@@ -889,7 +889,7 @@ int       ScanRecordSize, ScanMode;
                return;
                }
 
-     s$attach_port(&(object_t)"", &TempPath, &(short)0, &DestPortId, Code);
+     //s$attach_port(&(object_t)"", &TempPath, &(short)0, &DestPortId, Code);
      if (*Code) {
           strcpy(ErrorText, "s$attach_port Destination");
           u$errcat(ErrorText, DestPath);                              /* mcp */
